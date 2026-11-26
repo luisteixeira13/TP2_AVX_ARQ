@@ -1,0 +1,47 @@
+TP2 GCC123/PCC507 · Grupo 6
+Captura de referência · Linux x86_64 · AMD Ryzen 5 3600 · GCC 16.2.1
+O comando clock() mede tempo de CPU no Linux.
+Uma rodada por cenário, com aquecimento. Comparação com autovetorização
+desativada. Cada programa foi executado com AVX, AVX2 ou FMA real.
+
+=== avx ===
+====================================================================
+BENCHMARK AVX (256 bits - _mm256_sub_ps) - TP2 ARQUITETURA II
+====================================================================
+--------------------------------------------------------------------
+Cenario: Vetores menores
+Tamanho N = 1000003 floats (3.81 MiB por vetor | 15.26 MiB alocados)
+Repeticoes: 160 | Validacao numerica: OK
+Intensidade Aritmetica: 0.0833 FLOP/byte (1 FLOP / 12 bytes)
+Escalar -> Tempo: 0.045890 s | Desempenho: 3.49 GFLOP/s | Vazao logica: 41.84 GB/s
+AVX     -> Tempo: 0.023928 s | Desempenho: 6.69 GFLOP/s | Vazao logica: 80.24 GB/s
+Speedup (Escalar / AVX): 1.92x | Reducao de iteracoes do laco: 8x
+--------------------------------------------------------------------
+Cenario: Vetores maiores
+Tamanho N = 8000003 floats (30.52 MiB por vetor | 122.07 MiB alocados)
+Repeticoes: 24 | Validacao numerica: OK
+Intensidade Aritmetica: 0.0833 FLOP/byte (1 FLOP / 12 bytes)
+Escalar -> Tempo: 0.109432 s | Desempenho: 1.75 GFLOP/s | Vazao logica: 21.05 GB/s
+AVX     -> Tempo: 0.106617 s | Desempenho: 1.80 GFLOP/s | Vazao logica: 21.61 GB/s
+Speedup (Escalar / AVX): 1.03x | Reducao de iteracoes do laco: 8x
+
+=== avx2 ===
+AVX2 | _mm256_mullo_epi32 | 3 elementos de borda
+N = 1000003 | repeticoes = 160 | validacao exata: OK
+Amostra [0]: 4294967295 x 2 -> 4294967294
+Amostra [1000002]: 579 x 5 -> 2895
+Escalar: 0.065025 s | AVX2: 0.022961 s
+Razao de tempos (escalar / AVX2): 2.83x
+
+=== fma ===
+FMA | _mm256_fmadd_ps | 3 elementos de borda
+N = 1000003 | repeticoes = 160 | fmaf escalar x vetor: OK
+Produto e soma separados: 0x0p+0
+Multiplicacao e soma fundidas: -0x1p-46 (= -2^-46)
+Escalar fundido: 0.075102 s | FMA vetorial: 0.041237 s
+Razao de tempos (escalar / vetor): 1.82x
+
+Confirmação no executável via objdump -d
+AVX   vsubps
+AVX2  vpmulld
+FMA   vfmadd132ps

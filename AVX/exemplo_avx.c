@@ -1,5 +1,7 @@
 #include <immintrin.h> // Funcoes intrinsecas AVX / AVX2 / FMA
-#include <malloc.h>    // _aligned_malloc e _aligned_free (MinGW / Windows)
+#ifdef _WIN32
+#include <malloc.h>    // _aligned_malloc e _aligned_free no Windows
+#endif
 #include <math.h>      // fabsf() para validacao numerica
 #include <stdio.h>     // Entrada e saida padrao (printf)
 #include <stdlib.h>    // Utilitarios gerais
@@ -33,15 +35,33 @@
  * ============================================================================
  */
 
+// C11 exige que o tamanho passado a aligned_alloc seja multiplo do alinhamento.
+static void *alocar_vetor(size_t bytes) {
+#ifdef _WIN32
+    return _aligned_malloc(bytes, 32);
+#else
+    return aligned_alloc(32, (bytes + 31) / 32 * 32);
+#endif
+}
+
+static void liberar_vetor(void *vetor) {
+#ifdef _WIN32
+    _aligned_free(vetor);
+#else
+    free(vetor);
+#endif
+}
+
+// O atributo do GCC conserva cada chamada medida como uma operacao separada.
 // Funcao escalar tradicional: processa 1 elemento por iteracao
-static void subtracao_escalar(const float *a, const float *b, float *out, int n) {
+static __attribute__((noipa)) void subtracao_escalar(const float *a, const float *b, float *out, int n) {
     for (int i = 0; i < n; i++) {
         out[i] = a[i] - b[i];
     }
 }
 
 // Funcao vetorial AVX: processa 8 elementos float por iteracao (256 bits)
-static void subtracao_avx(const float *a, const float *b, float *out, int n) {
+static __attribute__((noipa)) void subtracao_avx(const float *a, const float *b, float *out, int n) {
     int limite = n - (n % 8); // Garante multiplos exatos de 8 elementos
     int i = 0;
 
@@ -74,22 +94,22 @@ static int validar_resultados(const float *ref, const float *obtido, int n) {
 }
 
 // Executa o benchmark para um tamanho de vetor N e imprime metricas completas
-static void executar_benchmark(int n, int repeticoes, const char *cenario) {
+static int executar_benchmark(int n, int repeticoes, const char *cenario) {
     size_t bytes_vetor = (size_t)n * sizeof(float);
 
     // Alocacao alinhada em 32 bytes (256 bits) exigida por _mm256_load_ps
-    float *a = (float *)_aligned_malloc(bytes_vetor, 32);
-    float *b = (float *)_aligned_malloc(bytes_vetor, 32);
-    float *res_esc = (float *)_aligned_malloc(bytes_vetor, 32);
-    float *res_avx = (float *)_aligned_malloc(bytes_vetor, 32);
+    float *a = (float *)alocar_vetor(bytes_vetor);
+    float *b = (float *)alocar_vetor(bytes_vetor);
+    float *res_esc = (float *)alocar_vetor(bytes_vetor);
+    float *res_avx = (float *)alocar_vetor(bytes_vetor);
 
     if (!a || !b || !res_esc || !res_avx) {
         fprintf(stderr, "Erro ao alocar memoria alinhada para N = %d.\n", n);
-        _aligned_free(a);
-        _aligned_free(b);
-        _aligned_free(res_esc);
-        _aligned_free(res_avx);
-        return;
+        liberar_vetor(a);
+        liberar_vetor(b);
+        liberar_vetor(res_esc);
+        liberar_vetor(res_avx);
+        return 0;
     }
 
     // Inicializa os vetores de entrada
@@ -135,21 +155,22 @@ static void executar_benchmark(int n, int repeticoes, const char *cenario) {
 
     printf("--------------------------------------------------------------------\n");
     printf("Cenario: %s\n", cenario);
-    printf("Tamanho N = %d floats (%.2f MB por vetor | %.2f MB total)\n",
+    printf("Tamanho N = %d floats (%.2f MiB por vetor | %.2f MiB alocados)\n",
            n, (double)bytes_vetor / (1024.0 * 1024.0),
-           (3.0 * (double)bytes_vetor) / (1024.0 * 1024.0));
+           (4.0 * (double)bytes_vetor) / (1024.0 * 1024.0));
     printf("Repeticoes: %d | Validacao numerica: %s\n", repeticoes, ok ? "OK" : "ERRO");
     printf("Intensidade Aritmetica: %.4f FLOP/byte (1 FLOP / 12 bytes)\n", intensidade_aritmetica);
-    printf("Escalar -> Tempo: %.6f s | Desempenho: %.2f GFLOP/s | Banda: %.2f GB/s\n",
+    printf("Escalar -> Tempo: %.6f s | Desempenho: %.2f GFLOP/s | Vazao logica: %.2f GB/s\n",
            t_esc, gflops_esc, bw_esc_gbs);
-    printf("AVX     -> Tempo: %.6f s | Desempenho: %.2f GFLOP/s | Banda: %.2f GB/s\n",
+    printf("AVX     -> Tempo: %.6f s | Desempenho: %.2f GFLOP/s | Vazao logica: %.2f GB/s\n",
            t_avx, gflops_avx, bw_avx_gbs);
     printf("Speedup (Escalar / AVX): %.2fx | Reducao de iteracoes do laco: 8x\n", speedup);
 
-    _aligned_free(a);
-    _aligned_free(b);
-    _aligned_free(res_esc);
-    _aligned_free(res_avx);
+    liberar_vetor(a);
+    liberar_vetor(b);
+    liberar_vetor(res_esc);
+    liberar_vetor(res_avx);
+    return ok;
 }
 
 int main(void) {
@@ -157,12 +178,8 @@ int main(void) {
     printf("BENCHMARK AVX (256 bits - _mm256_sub_ps) - TP2 ARQUITETURA II\n");
     printf("====================================================================\n");
 
-    // Cenario 1: Conjunto de dados cabe na Cache L3 (3 x 4 MB = 12 MB < 24 MB L3)
-    executar_benchmark(1000000, 1600, "Dentro da Cache L3 (12 MB totais)");
-
-    // Cenario 2: Conjunto de dados excede a Cache L3 e pressiona a RAM (96 MB > 24 MB L3)
-    executar_benchmark(8000000, 200, "Excede Cache L3 / Limitado por DRAM (96 MB totais)");
-
-    printf("====================================================================\n");
-    return 0;
+    // Ambos os tamanhos deixam tres elementos para o laco escalar residual.
+    int ok_menor = executar_benchmark(1000003, 160, "Vetores menores");
+    int ok_maior = executar_benchmark(8000003, 24, "Vetores maiores");
+    return ok_menor && ok_maior ? EXIT_SUCCESS : EXIT_FAILURE;
 }

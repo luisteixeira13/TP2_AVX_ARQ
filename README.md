@@ -1,44 +1,66 @@
-# Trabalho Prático 2: Paralelismo de Dados e Extensões Vetoriais (AVX/AVX2/FMA)
+# TP2 · Paralelismo de dados com AVX, AVX2 e FMA
 
-**Disciplina:** Arquitetura de Computadores II – GCC123/PCC507  
-**Universidade Federal de Lavras (UFLA)** – Departamento de Ciência da Computação  
-**Professor:** Luiz Henrique A. Correia  
+Arquitetura de Computadores II · GCC123/PCC507 · Universidade Federal de Lavras\
+Professor Luiz Henrique A. Correia
 
-## Grupo 6
+**Grupo 6**
 
-- **Bernado Henrique Diniz Felix**
-- **Guilherme dos Santos Cordeiro**
-- **Luis Felipe Costa Teixeira**
+- Bernado Henrique Diniz Felix
+- Guilherme dos Santos Cordeiro
+- Luis Felipe Costa Teixeira
 
-> *Composição do grupo: 3 integrantes, conforme exceção autorizada pelo professor para este grupo (mantida a mesma formação do Trabalho Prático 1).*
+Grupo com três integrantes, conforme a exceção autorizada para manter a formação do Trabalho Prático 1.
 
----
+## Pasta de entrega
 
-## Sobre o Trabalho
+O material para montar e enviar o trabalho está em [entrega](entrega/).
 
-Este repositório reúne os arquivos e códigos desenvolvidos para o **Trabalho Prático 2**, cujo objetivo é estudar os conceitos de paralelismo no nível de dados em arquiteturas modernas por meio de processadores vetoriais, modelo SIMT e programação em C/C++ utilizando funções intrínsecas SIMD (**AVX**, **AVX2** e **FMA**).
+| Arquivo | Uso |
+|---|---|
+| [Resumo escrito em PDF](entrega/Resumo_TP2_Grupo_6.pdf) | Anexar no Campus Virtual. |
+| [Código-fonte comentado em ZIP](entrega/Fontes_TP2_Grupo_6.zip) | Rodar os três exemplos na gravação e anexar o ZIP no Campus Virtual. |
+| [Slides editáveis](entrega/Slides_TP2_Grupo_6.pptx) | Usar na apresentação. |
+| [Roteiro em PDF](entrega/Roteiro_TP2_Grupo_6.pdf) | Seguir as falas e os comandos de cada integrante. |
+| [Bernado · Parte 1](entrega/apresentacaobernadoparte1.mp4) e [Parte 2](entrega/apresentacaobernadoparte2.mp4) | Inserir nessa ordem na montagem. |
 
-### Estrutura e Andamento Atual
+Depois das duas partes do Bernado, entra o Guilherme com AVX2 (slides 6 e 7), seguido do Luis com FMA, resultados e conclusão (slides 8 a 11). O vídeo final deve ter até 15 minutos. Enviar o link do YouTube junto com o resumo e o código-fonte no Campus Virtual até 27/11/2026, conforme o enunciado.
 
-O trabalho está dividido em duas etapas principais:
+## Material de referência
 
-- [x] **Etapa 1 – Resumo Teórico (`Resumo.md`):** Levantamento conceitual baseado nas aulas gravadas da disciplina, abordando Taxonomia de Flynn, modelo vetorial VMIPS, mecanismos de *Strip Mining* e registrador VLR, programação com intrínsecas AVX/AVX2 em C/C++ e arquitetura de GPUs (modelo SIMT e hierarquia de *threads*, blocos e *grids*).
-- [ ] **Etapa 2 – Implementação Prática e Vídeo:** Desenvolvimento de 3 exemplos práticos comentados em C/C++ (utilizando instruções **AVX**, **AVX2** e **FMA**) e gravação de apresentação explicativa de até 15 minutos demonstrando a execução e análise de desempenho.
+- [Roteiro editável](apresentacao/Roteiro.md) e [PDFs individuais](apresentacao/roteiros/pdf/)
+- [Slides em PDF](apresentacao/referencia/Slides_TP2_Grupo_6.pdf) e [MP4 de apoio visual](apresentacao/referencia/Apoio_Visual_TP2_Grupo_6.mp4)
+- [Saídas dos testes](apresentacao/Resultados.txt)
 
----
+## Compilar e executar
 
-## Execução da Parte AVX no Windows (Ambiente e Passos)
+Use GCC num sistema x86-64 com suporte a AVX, AVX2 e FMA. No Linux, as extensões aparecem em `/proc/cpuinfo`. No Windows, podem ser conferidas no CPU-Z e os comandos podem ser executados no terminal MSYS2 UCRT64.
 
-Para executar o exemplo prático de **AVX** no Windows, foram necessários os seguintes passos:
+Execute a partir da raiz do repositório:
 
-1. **Verificação de suporte SIMD no hardware (CPU-Z):** Conferir no **CPU-Z** (aba *CPU*, campo *Instructions*) se o processador possui suporte a `AVX` (e `AVX2` / `FMA3`) — no teste local, foi utilizado um **Intel Core i9-13900H** com suporte nativo às extensões.
-2. **Instalação do compilador GCC via MSYS2:** Instalar o **MSYS2** e, no terminal **UCRT64**, atualizar os pacotes (`pacman -Syu`) e instalar o GCC (`pacman -S --needed base-devel mingw-w64-ucrt-x86_64-gcc`, evitando ponto final no nome do pacote).
-3. **Navegação até a pasta do projeto no terminal MSYS2:** Acessar o diretório usando barras normais (`/`) ou aspas, por exemplo:
-   
-   cd "/c/Users/chand/Desktop/TP2_AVX_ARQ"
-   
-4. **Atenção ao alinhamento de memória no Windows/MinGW (_aligned_malloc):** Diferentemente do ambiente POSIX/Linux padrão que expõe aligned_alloc diretamente, no ambiente MinGW/UCRT64 a alocação alinhada em 32 bytes exigida pelas cargas alinhadas de 256 bits (`_mm256_load_ps / _mm256_store_ps`) é feita com _aligned_malloc(bytes, 32) e liberada com _aligned_free(...) (via <malloc.h>).
+```sh
+gcc -std=c11 -O2 -fno-tree-vectorize -mavx AVX/exemplo_avx.c -o avx
+./avx
 
-5. **Compilação e execução:** Compilar o código-fonte passando -mavx (e as flags de otimização desejadas) e executar o binário gerado:
+gcc -std=c11 -O2 -fno-tree-vectorize -mavx2 AVX2/exemplo_avx2.c -o avx2
+./avx2
 
-  gcc -O2 -mavx exemplo_avx.c -o exemplo_avx.exe && ./exemplo_avx.exe
+gcc -std=c11 -O2 -fno-tree-vectorize -ffp-contract=off -mavx -mfma FMA/exemplo_fma.c -lm -o fma
+./fma
+```
+
+No Windows, use `avx.exe`, `avx2.exe` e `fma.exe` como nomes dos executáveis tanto na compilação quanto na execução. O exemplo AVX reserva memória alinhada com `aligned_alloc` em Linux e `_aligned_malloc` no Windows. Os exemplos AVX2 e FMA usam intrínsecas de carga e escrita que aceitam endereços desalinhados a 32 bytes.
+
+## Resultados da captura
+
+A execução de referência foi feita em Linux x86-64, num Ryzen 5 3600, com GCC 16.2.1. Os três programas passaram na validação. A razão da tabela divide o tempo escalar pelo vetorial.
+
+| Exemplo | Escalar | Vetorial | Razão |
+|---|---:|---:|---:|
+| AVX, 1.000.003 elementos | 0,045890 s | 0,023928 s | 1,92× |
+| AVX, 8.000.003 elementos | 0,109432 s | 0,106617 s | 1,03× |
+| AVX2, 1.000.003 elementos | 0,065025 s | 0,022961 s | 2,83× |
+| FMA, 1.000.003 elementos | 0,075102 s | 0,041237 s | 1,82× |
+
+O caso maior da subtração teve ganho menor. O resultado é compatível com o custo de movimentar os dados, já que cada elemento envolve 12 bytes lógicos e uma subtração. A vazão impressa é calculada com esses 12 bytes por elemento, sem medição direta do tráfego da DRAM. O FMA compara o vetor com `fmaf` escalar. Um teste separado mostra zero com produto e soma arredondados separadamente e −2⁻⁴⁶ com a operação fundida.
+
+Os números são de uma rodada por cenário. As chamadas foram aquecidas antes da medição, os tempos no Linux são de CPU via `clock()`, e a autovetorização foi desativada para a comparação com os laços escalares. A [análise inicial de AVX em Windows](AVX/AnaliseAVX.md) registra uma rodada anterior, com outra máquina e metodologia.
